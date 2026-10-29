@@ -1,15 +1,16 @@
-// Licensed under the Dartastic Pro Software License Agreement.
+// Licensed under the Apache License, Version 2.0
 // Copyright 2025-2026 Mindful Software LLC d/b/a Dartastic.io, All rights reserved.
 
-import 'package:dartastic_opentelemetry/dartastic_opentelemetry.dart';
+import 'package:dartastic_opentelemetry_api/dartastic_opentelemetry_api.dart';
 
 import 'otel_inngest_suppression.dart';
 
 const _tracerName = 'dartastic_otel_libs_inngest';
 
-Tracer _tracer() => OTel.tracerProvider().getTracer(_tracerName);
+APITracer _tracer() => OTelAPI.tracerProvider().getTracer(_tracerName);
 
 class InngestSendResult {
+  /// Creates a result.
   const InngestSendResult({this.eventIds, this.batchSize});
 
   /// `ids` field from the `POST /e/<key>` response.
@@ -17,8 +18,13 @@ class InngestSendResult {
   final int? batchSize;
 }
 
+/// What a traced call returned: the value for the caller plus fields
+/// recorded on the span.
 class InngestSendCallResult<T> {
+  /// Creates a call result.
   const InngestSendCallResult({required this.value, this.result});
+
+  /// The value returned to the caller.
   final T value;
   final InngestSendResult? result;
 }
@@ -51,37 +57,37 @@ Future<T> tracedInngestSend<T>({
   final span = _tracer().startSpan(
     'inngest send $eventName',
     kind: SpanKind.producer,
-    attributes: OTel.attributesFromMap(m),
+    attributes: OTelAPI.attributesFromMap(m),
   );
   try {
     final r = await invoke();
     if (r.result != null) {
       final extras = <Attribute<Object>>[];
       if (r.result!.eventIds != null && r.result!.eventIds!.isNotEmpty) {
-        extras.add(OTel.attributeString(
+        extras.add(OTelAPI.attributeString(
           'inngest.event.ids',
           r.result!.eventIds!.join(','),
         ));
         if (r.result!.eventIds!.length == 1) {
-          extras.add(OTel.attributeString(
+          extras.add(OTelAPI.attributeString(
             'messaging.message.id',
             r.result!.eventIds!.first,
           ));
         }
       }
       if (r.result!.batchSize != null) {
-        extras.add(OTel.attributeInt(
+        extras.add(OTelAPI.attributeInt(
           'messaging.batch.message_count',
           r.result!.batchSize!,
         ));
       }
-      if (extras.isNotEmpty) span.addAttributes(OTel.attributes(extras));
+      if (extras.isNotEmpty) span.addAttributes(OTelAPI.attributes(extras));
     }
     return r.value;
   } catch (e, st) {
-    span.addAttributes(OTel.attributes([
-      OTel.attributeString(
-        ErrorResource.errorType.key,
+    span.addAttributes(OTelAPI.attributes([
+      OTelAPI.attributeString(
+        ErrorAttributes.errorType.key,
         e.runtimeType.toString(),
       ),
     ]));
